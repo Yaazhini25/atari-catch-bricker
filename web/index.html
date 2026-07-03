@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Q-Learning Brick Catcher</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    background: #0f1117; font-family: 'Segoe UI', Roboto, sans-serif; color: #eee;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; letter-spacing: 0.3px; }
+  #wrap { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; justify-content: center; }
+  canvas { background: #1a1d27; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+  #panel {
+    background: #171922; border-radius: 8px; padding: 16px 20px;
+    min-width: 220px; font-size: 14px; line-height: 1.9;
+  }
+  #panel b { color: #7db7ff; }
+  button {
+    background: #2f6fed; color: white; border: none; padding: 8px 14px;
+    border-radius: 6px; cursor: pointer; font-size: 13px; margin-right: 6px; margin-top: 4px;
+  }
+  button:hover { background: #4a83f0; }
+  .row { margin-bottom: 6px; }
+  #bar-bg { background: #2a2d3a; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; margin-top: 4px;}
+  #bar-fill { background: linear-gradient(90deg,#2f6fed,#7db7ff); height: 100%; width: 0%; }
+  a { color: #7db7ff; }
+</style>
+</head>
+<body>
+<h1>🧱 Q-Learning Brick Catcher — Reinforcement Learning Demo</h1>
+<div id="wrap">
+  <canvas id="game" width="500" height="500"></canvas>
+  <div id="panel">
+    <div class="row">Episodes: <b id="episodes">0</b></div>
+    <div class="row">Catches: <b id="catches">0</b></div>
+    <div class="row">Catch rate (last 100): <b id="rate">0%</b></div>
+    <div id="bar-bg"><div id="bar-fill"></div></div>
+    <div class="row" style="margin-top:10px;">Epsilon (exploration): <b id="epsilon">1.00</b></div>
+    <div class="row">Speed: <b id="speedLabel">1x</b></div>
+    <button onclick="setSpeed(1)">1x</button>
+    <button onclick="setSpeed(5)">5x</button>
+    <button onclick="setSpeed(25)">25x</button>
+    <button onclick="resetAll()">Reset Agent</button>
+    <p style="opacity:0.7; margin-top:14px; font-size:12.5px;">
+      Tabular Q-learning agent learns purely from reward signal: <br>
+      +1 for catching the brick, -1 for missing it. <br>
+      No supervision — behavior emerges from trial and error.
+    </p>
+  </div>
+</div>
+
+<script>
+// ---------------- Q-Learning Brick Catcher (browser port) ----------------
+const GRID_W = 10, GRID_H = 10, CELL = 50;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// Q-table[paddle_x][brick_x][brick_y][action]
+function makeQTable() {
+  return Array.from({length: GRID_W}, () =>
+    Array.from({length: GRID_W}, () =>
+      Array.from({length: GRID_H}, () => [0,0,0])));
+}
+let Q = makeQTable();
+
+let alpha = 0.1, gamma = 0.95;
+let epsilon = 1.0, epsilonMin = 0.05, epsilonDecay = 0.9995;
+
+let paddleX, brickX, brickY;
+let episodes = 0, catches = 0, recent = [];
+let speed = 1;
+
+function resetEnv() {
+  paddleX = Math.floor(GRID_W / 2);
+  brickX = Math.floor(Math.random() * GRID_W);
+  brickY = 0;
+}
+
+function chooseAction(px, bx, by, greedy=false) {
+  if (!greedy && Math.random() < epsilon) return Math.floor(Math.random()*3);
+  const qs = Q[px][bx][by];
+  let best = 0;
+  for (let a=1;a<3;a++) if (qs[a] > qs[best]) best = a;
+  return best;
+}
+
+function stepEnv(action) {
+  if (action === 0) paddleX = Math.max(0, paddleX - 1);
+  else if (action === 2) paddleX = Math.min(GRID_W-1, paddleX + 1);
+  brickY += 1;
+  let done = false, reward = -0.01;
+  if (brickY >= GRID_H - 1) {
+    done = true;
+    reward = (paddleX === brickX) ? 1.0 : -1.0;
+  }
+  return {reward, done};
+}
+
+function update(px, bx, by, action, reward, npx, nbx, nby, done) {
+  const currentQ = Q[px][bx][by][action];
+  const maxFuture = done ? 0 : Math.max(...Q[npx][nbx][nby]);
+  const target = reward + gamma * maxFuture;
+  Q[px][bx][by][action] = currentQ + alpha * (target - currentQ);
+}
+
+resetEnv();
+
+function draw() {
+  ctx.fillStyle = '#1a1d27';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.strokeStyle = '#2a2d3a';
+  for (let x=0;x<=GRID_W;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,GRID_H*CELL); ctx.stroke(); }
+  for (let y=0;y<=GRID_H;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(GRID_W*CELL,y*CELL); ctx.stroke(); }
+
+  // brick
+  ctx.fillStyle = '#e15656';
+  ctx.fillRect(brickX*CELL+8, brickY*CELL+8, CELL-16, CELL-16);
+
+  // paddle
+  ctx.fillStyle = '#4a83f0';
+  ctx.fillRect(paddleX*CELL, (GRID_H-1)*CELL, CELL, CELL/3);
+}
+
+function updateHUD() {
+  document.getElementById('episodes').textContent = episodes;
+  document.getElementById('catches').textContent = catches;
+  const rate = recent.length ? (recent.reduce((a,b)=>a+b,0)/recent.length*100) : 0;
+  document.getElementById('rate').textContent = rate.toFixed(0) + '%';
+  document.getElementById('bar-fill').style.width = rate.toFixed(0) + '%';
+  document.getElementById('epsilon').textContent = epsilon.toFixed(3);
+}
+
+function setSpeed(s) {
+  speed = s;
+  document.getElementById('speedLabel').textContent = s + 'x';
+}
+
+function resetAll() {
+  Q = makeQTable();
+  epsilon = 1.0;
+  episodes = 0; catches = 0; recent = [];
+  resetEnv();
+  updateHUD();
+}
+
+function tick() {
+  for (let i=0;i<speed;i++) {
+    const state = [paddleX, brickX, brickY];
+    const action = chooseAction(...state);
+    const {reward, done} = stepEnv(action);
+    const nextState = [paddleX, brickX, brickY];
+    update(state[0],state[1],state[2], action, reward, nextState[0],nextState[1],nextState[2], done);
+
+    if (done) {
+      episodes++;
+      const caught = reward > 0;
+      if (caught) catches++;
+      recent.push(caught ? 1 : 0);
+      if (recent.length > 100) recent.shift();
+      epsilon = Math.max(epsilonMin, epsilon * epsilonDecay);
+      resetEnv();
+    }
+  }
+  draw();
+  updateHUD();
+  requestAnimationFrame(tick);
+}
+
+tick();
+</script>
+</body>
+</html>
