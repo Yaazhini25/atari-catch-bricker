@@ -31,7 +31,7 @@
 </style>
 </head>
 <body>
-<h1>🧱 Q-Learning Brick Catcher — Reinforcement Learning Demo</h1>
+<h1> Q-Learning Brick Catcher — RL Demo</h1>
 <div id="wrap">
   <canvas id="game" width="500" height="500"></canvas>
   <div id="panel">
@@ -44,11 +44,11 @@
     <button onclick="setSpeed(1)">1x</button>
     <button onclick="setSpeed(5)">5x</button>
     <button onclick="setSpeed(25)">25x</button>
-    <button onclick="resetAll()">Reset Agent</button>
+    <button onclick="resetAll()">Reset Agent</button> <br> <br>
     <p style="opacity:0.7; margin-top:14px; font-size:12.5px;">
-      Tabular Q-learning agent learns purely from reward signal: <br>
-      +1 for catching the brick, -1 for missing it. <br>
-      No supervision — behavior emerges from trial and error.
+      <b>Tabular Q-learning agent learns purely from reward signal: </b> <br>
+            -> +1 for catching the brick, -1 for missing it. <br>
+            -> No supervision — behavior emerges from trial and error.
     </p>
   </div>
 </div>
