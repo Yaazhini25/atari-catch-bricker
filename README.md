@@ -1,4 +1,4 @@
-# Q-Learning Brick Catcher 🧱
+# Q-Learning Brick Catcher
 
 A reinforcement learning agent that learns to play a brick-catching game
 through pure reward optimization (tabular Q-learning), built with
